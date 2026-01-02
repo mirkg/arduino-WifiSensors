@@ -24,7 +24,8 @@ FlashStorage(pinout_flash_store, Pinout);
 FlashStorage(devices_flash_store, Devices);
 
 volatile RunningMode runMode = RUN_MODE_SERVER;
-volatile byte runStatus = 0x0;
+volatile RunStatus runStatus = RUN_STATUS_BOOT;
+volatile bool runStatuChanged = false;
 int status = WL_IDLE_STATUS;
 bool restatPending = false;
 unsigned long then;
@@ -216,7 +217,7 @@ bool configureNetwork()
     else
     {
       runMode = RUN_MODE_AP;
-      runStatus = 0x2;
+      setRunStatus(RUN_STATUS_AP_MODE);
 
       WiFi.config(IPAddress(10, 10, 10, 1));
 
@@ -230,7 +231,7 @@ bool configureNetwork()
       if (status != WL_AP_LISTENING)
       {
         Serial.println(F("Błąd uruchomienia w trybie AP!"));
-        runStatus = 0x3;
+        setRunStatus(RUN_STATUS_ERROR);
         while (true)
         {
           showRunStatus();
@@ -256,7 +257,7 @@ bool configureNetwork()
           serverConfig.valid = true;
           conf_flash_store.write(serverConfig);
         }
-        runStatus = 0x1;
+        setRunStatus(RUN_STATUS_OK);
         return true;
       }
       delay(5000);
@@ -270,7 +271,7 @@ bool configureNetwork()
       runMode = RUN_MODE_AP;
       serverConfig.set = false;
       conf_flash_store.write(serverConfig);
-      runStatus = 0x3;
+      setRunStatus(RUN_STATUS_ERROR);
     }
 
     restart(true, 3000);
@@ -298,9 +299,9 @@ void factoryReset()
       restart(true, 3000);
     }
   }
-  
+
   pinMode(STATUS_PIN, OUTPUT);
-  runStatus = 0x0;
+  setRunStatus(RUN_STATUS_BOOT);
   showRunStatus();
 }
 
@@ -527,6 +528,12 @@ void handleInputDevices()
         break;
       case DEVICE_DHT22:
         stats.processingWarnings += readDHT22(dev, stats.lastWarning);
+        break;
+      case DEVICE_GENERIC_ANALOG_INPUT:
+        stats.processingWarnings += readAnalog(dev, stats.lastWarning);
+        break;
+      case DEVICE_GENERIC_DIGITAL_INPUT:
+        stats.processingWarnings += readDigital(dev, stats.lastWarning);
         break;
       case DEVICE_MOTION:
         stats.processingWarnings += readMotion(dev, stats.lastWarning);
@@ -1078,7 +1085,7 @@ void handleSerwer()
         {
           requestPath = currentLine;
         }
-        else if (currentLine.startsWith("HTTP/")) //response header
+        else if (currentLine.startsWith("HTTP/")) // response header
         {
           requestPath = currentLine;
         }
@@ -1103,7 +1110,7 @@ void restart(bool set, long rdelay)
     WiFi.end();
     Serial.println("Restart...");
     delay(3000);
-    runStatus = 0x0;
+    setRunStatus(RUN_STATUS_BOOT);
     setupServer();
   }
 
@@ -1142,6 +1149,12 @@ void setPinMode(DevicePin &pin)
 
   pinout.set = true;
   pinout_flash_store.write(pinout);
+}
+
+void setRunStatus(RunStatus status)
+{
+  runStatus = status;
+  runStatuChanged = true;
 }
 
 void setupDevices()
@@ -1189,6 +1202,10 @@ void setupNewDevice(byte deviceId, bool update)
     break;
   case DEVICE_DHT22:
     setupDHT22(dev);
+    break;
+  case DEVICE_GENERIC_ANALOG_INPUT:
+  case DEVICE_GENERIC_DIGITAL_INPUT:
+    setupGeneric(dev);
     break;
   case DEVICE_MOTION:
     setupButton(dev);
@@ -1271,7 +1288,7 @@ void setupServer()
   if (!configureNetwork())
   {
     Serial.println("Błąd wifi");
-    runStatus = 0x3;
+    setRunStatus(RUN_STATUS_ERROR);
     while (true)
     {
       showRunStatus();
@@ -1285,25 +1302,30 @@ void setupServer()
 
 void showRunStatus()
 {
-  if (runStatus == 0x0)
+  if (!runStatuChanged)
   {
+    return;
+  }
+
+  runStatuChanged = false;
+  switch (runStatus)
+  {
+  case RUN_STATUS_BOOT:
     digitalWrite(STATUS_PIN, LOW);
-  }
-  else if (runStatus == 0x1)
-  {
+    break;
+  case RUN_STATUS_OK:
     digitalWrite(STATUS_PIN, HIGH);
-  }
-  else if (runStatus == 0x2)  //AP MODE
-  {
+    break;
+  case RUN_STATUS_AP_MODE:
     digitalWrite(STATUS_PIN, LOW);
     delay(200);
     digitalWrite(STATUS_PIN, HIGH);
-  }
-  else if (runStatus == 0x3)  //ERROR
-  {
+    break;
+  case RUN_STATUS_ERROR:
     digitalWrite(STATUS_PIN, LOW);
     delay(500);
     digitalWrite(STATUS_PIN, HIGH);
+    break;
   }
 }
 

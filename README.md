@@ -5,6 +5,16 @@
 **WifiSensors** is a project to work with multiple devices connected to Arduino and manage them over wifi.
 Main idea about this code is to have easy communication with automation systems over simple API.
 
+### Supported devices
+
+  - BUTTON, SWITCH (DIGITAL INPUT)
+  - GENERIC ANALOG INPUT (ANALOG INPUT)
+  - GENERIC DIGITAL INPUT (DIGITAL INPUT)
+  - MOTION (DIGITAL INPUT)
+  - RELAY (OUTPUT)
+  - DHT22 (INPUT)
+  - ONEWIRE DALLAS TEMP SENSOR (INPUT)
+
 ## Run
 
 ### Startup

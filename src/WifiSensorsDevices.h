@@ -4,10 +4,10 @@
 /*
 /config
 * BUTTON - bounce=[int] default:20
-* DHT22 - humid_adj[float] default:0.0, temp_adj[float] default:0.0 
+* DHT22 - humid_adj[float] default:0.0, temp_adj[float] default:0.0
 * MOTION - bounce=[int] default:5
 * RELAY - trigger=[HIGH|LOW] default:HIGH
-* DEVICE_TEMP_DALLAS - temp_adj[float] default:0.0 
+* DEVICE_TEMP_DALLAS - temp_adj[float] default:0.0
 */
 
 #include "WifiSensorsTypes.h"
@@ -95,6 +95,35 @@ bool configureDHT22(Hashtable<String, String> *config, Device *dev)
   return true;
 }
 
+bool configureGenericAnalog(Hashtable<String, String> *config, Device *dev)
+{
+  if (config->containsKey("min"))
+  {
+    String adj = *config->get("min");
+    dev->config.floats[DEVICE_CONFIG_FLOAT_MIN] = adj.toFloat();
+  }
+  else
+  {
+    dev->config.floats[DEVICE_CONFIG_FLOAT_MIN] = 0.0f;
+  }
+  if (config->containsKey("max"))
+  {
+    String adj = *config->get("max");
+    dev->config.floats[DEVICE_CONFIG_FLOAT_MAX] = adj.toFloat();
+  }
+  else
+  {
+    dev->config.floats[DEVICE_CONFIG_FLOAT_MAX] = 1023.0f;
+  }
+
+  return true;
+}
+
+bool configureGenericDigital(Hashtable<String, String> *config, Device *dev)
+{
+  return true;
+}
+
 bool configureMotion(Hashtable<String, String> *config, Device *dev)
 {
   dev->config.ints[DEVICE_CONFIG_INTS_DEBOUNCE] = 5;
@@ -158,6 +187,10 @@ bool deviceConfigUpdated(Hashtable<String, String> *config, Device *dev)
     return configureButton(config, dev);
   case DEVICE_DHT22:
     return configureDHT22(config, dev);
+  case DEVICE_GENERIC_ANALOG_INPUT:
+    return configureGenericAnalog(config, dev);
+  case DEVICE_GENERIC_DIGITAL_INPUT:
+    return configureGenericDigital(config, dev);
   case DEVICE_MOTION:
     return configureMotion(config, dev);
   case DEVICE_RELAY:
@@ -185,6 +218,14 @@ byte deviceValuesNames(DeviceType type, byte deviceId)
     devicesValues[deviceId].names[1] = "humid";
     devicesValues[deviceId].units[1] = "%";
     return 2;
+  case DEVICE_GENERIC_ANALOG_INPUT:
+    devicesValues[deviceId].names[0] = "value";
+    devicesValues[deviceId].units[0] = "conf(min)-conf(max)";
+    return 1;
+  case DEVICE_GENERIC_DIGITAL_INPUT:
+    devicesValues[deviceId].names[0] = "value";
+    devicesValues[deviceId].units[0] = "0/1";
+    return 1;
   case DEVICE_MOTION:
     devicesValues[deviceId].names[0] = "state";
     devicesValues[deviceId].units[0] = "on/off";
@@ -201,6 +242,73 @@ byte deviceValuesNames(DeviceType type, byte deviceId)
     devicesValues[deviceId].names[0] = "temp";
     devicesValues[deviceId].units[0] = "C";
     return 1;
+  }
+  return 0;
+}
+
+byte readAnalog(Device *dev, String &lastWarning)
+{
+  int value;
+  switch (dev->pins[0].pin)
+  {
+  case 0:
+    value = analogRead(A0);
+    break;
+  case 1:
+    value = analogRead(A1);
+    break;
+  case 2:
+    value = analogRead(A2);
+    break;
+  case 3:
+    value = analogRead(A3);
+    break;
+  case 4:
+    value = analogRead(A4);
+    break;
+  case 5:
+    value = analogRead(A5);
+    break;
+  case 6:
+    value = analogRead(A6);
+    break;
+  case 7:
+    value = analogRead(A7);
+    break;
+  }
+
+  value = map(value, 0, 1023, dev->config.floats[DEVICE_CONFIG_FLOAT_MIN], dev->config.floats[DEVICE_CONFIG_FLOAT_MAX]);
+  float val = 1.0f * value;
+  devicesValues[dev->deviceId].values[0] = String(val, 2);
+
+  if (dev->pushCallback.set)
+  {
+    String path;
+    String value = String(val, 2);
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value, path, devicesValues[dev->deviceId].names[0]);
+    return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
+  }
+  return 0;
+}
+
+byte readDigital(Device *dev, String &lastWarning)
+{
+  String value;
+  if (digitalRead(dev->pins[0].pin) == HIGH)
+  {
+    value = "1";
+  }
+  else
+  {
+    value = "0";
+  }
+  devicesValues[dev->deviceId].values[0] = value;
+
+  if (dev->pushCallback.set)
+  {
+    String path;
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value, path, devicesValues[dev->deviceId].names[0]);
+    return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
   }
   return 0;
 }
@@ -402,6 +510,18 @@ void setupDHT22(Device *dev)
   if (readDealay > dev->pollInterval)
   {
     dev->pollInterval = readDealay;
+  }
+}
+
+void setupGeneric(Device *dev)
+{
+  if (dev->type == DEVICE_GENERIC_DIGITAL_INPUT)
+  {
+    devicesValues[dev->deviceId].values[0] = "0";
+  }
+  else
+  {
+    devicesValues[dev->deviceId].values[0] = "0.0";
   }
 }
 

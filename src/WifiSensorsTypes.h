@@ -31,7 +31,7 @@
 #define WS_DEVICE_CONFIG_INTS 1
 #endif
 #ifndef WS_DEVICE_CONFIG_FLOATS
-#define WS_DEVICE_CONFIG_FLOATS 2
+#define WS_DEVICE_CONFIG_FLOATS 4
 #endif
 #ifndef WS_DEVICE_CONFIG_LONGS
 #define WS_DEVICE_CONFIG_LONGS 1
@@ -44,6 +44,14 @@ enum RunningMode
 {
   RUN_MODE_AP,
   RUN_MODE_SERVER,
+};
+
+enum RunStatus
+{
+  RUN_STATUS_BOOT,
+  RUN_STATUS_OK,
+  RUN_STATUS_AP_MODE,
+  RUN_STATUS_ERROR,
 };
 
 typedef struct
@@ -102,6 +110,8 @@ enum DeviceType
 {
   DEVICE_BUTTON,
   DEVICE_DHT22,
+  DEVICE_GENERIC_ANALOG_INPUT,
+  DEVICE_GENERIC_DIGITAL_INPUT,
   DEVICE_MOTION,
   DEVICE_RELAY,
   DEVICE_SWITCH,
@@ -118,6 +128,8 @@ enum DeviceConfigFloats
 {
   DEVICE_CONFIG_FLOAT_HUMID_ADJ,
   DEVICE_CONFIG_FLOAT_TEMP_ADJ,
+  DEVICE_CONFIG_FLOAT_MIN,
+  DEVICE_CONFIG_FLOAT_MAX,
 };
 
 enum DeviceConfigInts
@@ -167,6 +179,14 @@ inline DeviceType deviceTypeFromStr(String &type)
   {
     return DEVICE_BUTTON;
   }
+  else if (type == "GENERIC_ANALOG")
+  {
+    return DEVICE_GENERIC_ANALOG_INPUT;
+  }
+  else if (type == "GENERIC_DIGITAL")
+  {
+    return DEVICE_GENERIC_DIGITAL_INPUT;
+  }
   else if (type == "DHT22")
   {
     return DEVICE_DHT22;
@@ -196,22 +216,20 @@ inline String deviceTypetoStr(DeviceType type)
   {
   case DEVICE_BUTTON:
     return "BUTTON";
-    break;
   case DEVICE_DHT22:
     return "DHT22";
-    break;
+  case DEVICE_GENERIC_ANALOG_INPUT:
+    return "GENERIC_ANALOG";
+  case DEVICE_GENERIC_DIGITAL_INPUT:
+    return "GENERIC_DIGITAL";
   case DEVICE_MOTION:
     return "MOTION";
-    break;
   case DEVICE_RELAY:
     return "RELAY";
-    break;
   case DEVICE_SWITCH:
     return "SWITCH";
-    break;
   case DEVICE_TEMP_DALLAS:
     return "TEMP_DALLAS";
-    break;
   default:
     return "UNKNOWN";
   }

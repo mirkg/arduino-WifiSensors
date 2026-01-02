@@ -33,6 +33,12 @@ void WifiSensorsUtils::configToString(Device &dev, String &str)
     str += ",\"temp_adj\":";
     str += dev.config.floats[DEVICE_CONFIG_FLOAT_TEMP_ADJ];
     break;
+  case DEVICE_GENERIC_ANALOG_INPUT:
+    str += "\"min\":";
+    str += dev.config.floats[DEVICE_CONFIG_FLOAT_MIN];
+    str += ",\"max\":";
+    str += dev.config.floats[DEVICE_CONFIG_FLOAT_MAX];
+    break;
   case DEVICE_MOTION:
     str += "\"bounce\":";
     str += dev.config.ints[DEVICE_CONFIG_INTS_DEBOUNCE];
@@ -59,6 +65,8 @@ byte WifiSensorsUtils::deviceRequirePins(DeviceType type)
   {
   case DEVICE_BUTTON:
   case DEVICE_DHT22:
+  case DEVICE_GENERIC_ANALOG_INPUT:
+  case DEVICE_GENERIC_DIGITAL_INPUT:
   case DEVICE_MOTION:
   case DEVICE_RELAY:
   case DEVICE_SWITCH:
