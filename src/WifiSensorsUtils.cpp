@@ -107,7 +107,7 @@ void WifiSensorsUtils::digitalWriteAnalogPin(int pin, byte value)
   }
 }
 
-void WifiSensorsUtils::getStatusStr(String &str, ServerStats* stats)
+void WifiSensorsUtils::getStatusStr(String &str, ServerStats *stats)
 {
   str += "{";
   str += "\"version\":\"";
@@ -244,7 +244,7 @@ bool WifiSensorsUtils::pinUsedByDevice(Pinout &pinout, String &pinId)
   return false;
 }
 
-void WifiSensorsUtils::printWifiStatus(ServerStats* stats)
+void WifiSensorsUtils::printWifiStatus(ServerStats *stats)
 {
   Serial.print(F("MAC: "));
   Serial.println(stats->macStr);
@@ -367,14 +367,30 @@ void WifiSensorsUtils::sendHeader(const char *code, const char *contentType)
 
 byte WifiSensorsUtils::sendHttpRequest(Callback &callback, String path)
 {
+  // wait for client to finish processing
+  for (byte i = 0; i < 20; i++)
+  {
+    if (wifiClient.connected())
+    {
+#if DEBUG
+      Serial.print(F("Wait for client to close "));
+      Serial.println(i);
+#endif
+      delay(10);
+    }
+    else
+    {
+      break;
+    }
+  }
+
   wifiClient.stop();
 
   if (wifiClient.connect(callback.host, callback.port))
   {
-#if DEBUG
-    Serial.print(F("Sending: "));
+    Serial.print(millis());
+    Serial.print(F(" Sending: "));
     Serial.println(path);
-#endif
 
     wifiClient.print("GET ");
     wifiClient.print(path);
@@ -559,7 +575,7 @@ bool WifiSensorsUtils::isCallbackUrlValid(Hashtable<String, String> *config, Dev
   {
     callback = callback.substring(pos1 + 3);
   }
-  
+
   pos1 = callback.indexOf(':');
   pos2 = callback.indexOf('/');
   if (pos2 < 1)

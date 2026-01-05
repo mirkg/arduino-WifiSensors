@@ -6,7 +6,7 @@
 #define WS_SERVER_PORT 80
 #define VALUES_PROCESSING_TIME 50
 #define SERVER_PROCESSING_TIME 100
-#define LOW_MEMORY 3000
+#define LOW_MEMORY 2000
 #define STATUS_PIN 13
 
 #include "arduino_secrets.h"
