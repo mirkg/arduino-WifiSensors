@@ -1,6 +1,8 @@
 
 #include "WifiSensorsUtils.h"
 
+#define DEBUG 0
+
 extern WiFiClient wifiClient;
 
 #ifdef __arm__
@@ -137,6 +139,10 @@ void WifiSensorsUtils::getStatusStr(String &str, ServerStats *stats)
 
 void WifiSensorsUtils::parseConfigData(String &payload, Hashtable<String, String> *config)
 {
+#if DEBUG
+      Serial.println(F("PAYLOAD"));
+#endif
+
   int pos1, pos2;
   String tmp;
   do
@@ -156,6 +162,11 @@ void WifiSensorsUtils::parseConfigData(String &payload, Hashtable<String, String
     if (pos2 > -1)
     {
       config->put(tmp.substring(0, pos2), tmp.substring(pos2 + 1));
+#if DEBUG
+      Serial.print(tmp.substring(0, pos2));
+      Serial.print("=");
+      Serial.println(tmp.substring(pos2 + 1));
+#endif
     }
   } while (pos1 > -1);
 }
@@ -260,7 +271,7 @@ void WifiSensorsUtils::printWifiStatus(ServerStats *stats)
   Serial.println(F(" dBm"));
 }
 
-void WifiSensorsUtils::prepareCallbackValues(char *raw, DeviceType type, byte deviceId, String &value1, String &path, String &value0Name)
+void WifiSensorsUtils::prepareCallbackValues(char *raw, String &value1, String &path, String &value0Name)
 {
   path = String(raw);
   String replString = String("<") + value0Name + ">";
@@ -269,7 +280,7 @@ void WifiSensorsUtils::prepareCallbackValues(char *raw, DeviceType type, byte de
   path.replace(replString, strValue1);
 }
 
-void WifiSensorsUtils::prepareCallbackValues(char *raw, DeviceType type, byte deviceId, String &value1, String &value2, String &path, String &value0Name, String &value1Name)
+void WifiSensorsUtils::prepareCallbackValues(char *raw, String &value1, String &value2, String &path, String &value0Name, String &value1Name)
 {
   path = String(raw);
   String strValue1 = String(value1);
@@ -280,6 +291,20 @@ void WifiSensorsUtils::prepareCallbackValues(char *raw, DeviceType type, byte de
   replString = String("<") + value1Name + ">";
   strValue2 = encode(strValue2);
   path.replace(replString, strValue2);
+}
+
+void WifiSensorsUtils::processWarning(Callback &callback, String &msg)
+{
+  if (callback.set)
+  {
+    String path;
+    static String msgTemplate = "msg";
+    prepareCallbackValues(callback.path, msg, path, msgTemplate);
+    if (!sendHttpRequest(callback, path))
+    {
+      Serial.println(F("Process warning failed!"));
+    }
+  }
 }
 
 void WifiSensorsUtils::pushCallbackToString(Callback &callback, String &str)
@@ -338,6 +363,8 @@ void WifiSensorsUtils::sendConfigHtml()
   wifiClient.println("<p>PASSWORD<input name='pass' type='password' value='' required/></p>");
   wifiClient.println("<h2>Ustawienia serwera http:</h2>");
   wifiClient.println("<p>AUTH HEADER<input name='serverauth' value=''/></p>");
+  wifiClient.println("<p>WARNING CALLBACK<input name='callback' value=''/></p>");
+  wifiClient.println("<p>WARNING CALLBACK AUTH HEADER<input name='auth_header' value=''/></p>");
   wifiClient.println("<input type='submit' value='Ustaw'/>");
   wifiClient.println("</form>");
   wifiClient.println("</body></html>");
@@ -430,7 +457,7 @@ void WifiSensorsUtils::sendStatusForbidden()
   wifiClient.println();
 }
 
-bool WifiSensorsUtils::sentLoginChallange(String &serverauth, HttpRequest &req)
+bool WifiSensorsUtils::sendLoginChallange(String &serverauth, HttpRequest &req)
 {
   if (serverauth != "")
   {
@@ -456,6 +483,29 @@ bool WifiSensorsUtils::sentLoginChallange(String &serverauth, HttpRequest &req)
   }
 
   return false;
+}
+
+void WifiSensorsUtils::serverConfigToString(ServerConfig &serverConfig, String &str)
+{
+  str = "{";
+  str += "\"ssid\":\"";
+  str += serverConfig.ssid;
+  str += "\",\"serverauth\":\"";
+  String serverauth = String(serverConfig.serverauth);
+  if (serverauth.length() > 0)
+  {
+    str += "(redacted)";
+  }
+  str += "\",\"callback\":\"";
+  String callbackStr;
+  pushCallbackToString(serverConfig.callback, callbackStr);
+  str += callbackStr;
+  str += "\",\"callbackauth\":\"";
+  if (serverConfig.callback.set)
+  {
+    str += "(redacted)";
+  }
+  str += "\"}";
 }
 
 void WifiSensorsUtils::setAnalogPinMode(int pin, int mode)
@@ -536,20 +586,20 @@ bool WifiSensorsUtils::statusAuthorizationForbidden(String &serverauth, HttpRequ
   }
 }
 
-bool WifiSensorsUtils::isCallbackUrlValid(Hashtable<String, String> *config, Device *dev)
+bool WifiSensorsUtils::isCallbackUrlValid(Hashtable<String, String> *config, Callback &callback)
 {
-  dev->pushCallback.set = false;
+  callback.set = false;
 
-  String callback;
+  String callbackStr;
   String callbackAuth;
 
   if (config->containsKey("callback"))
   {
-    callback = *config->get("callback");
-    callback = decode(callback);
+    callbackStr = *config->get("callback");
+    callbackStr = decode(callbackStr);
   }
 
-  if (callback.length() == 0)
+  if (callbackStr.length() == 0)
   {
     return true;
   }
@@ -560,7 +610,7 @@ bool WifiSensorsUtils::isCallbackUrlValid(Hashtable<String, String> *config, Dev
     callbackAuth.replace("+", " ");
   }
 
-  if (callback.substring(0, 4) == "https")
+  if (callbackStr.substring(0, 4) == "https")
   {
     String msg = String("https not supported");
     sendError(msg);
@@ -570,47 +620,45 @@ bool WifiSensorsUtils::isCallbackUrlValid(Hashtable<String, String> *config, Dev
   int pos1, pos2;
 
   // remove prefix
-  pos1 = callback.indexOf("://");
+  pos1 = callbackStr.indexOf("://");
   if (pos1 > -1)
   {
-    callback = callback.substring(pos1 + 3);
+    callbackStr = callbackStr.substring(pos1 + 3);
   }
 
-  pos1 = callback.indexOf(':');
-  pos2 = callback.indexOf('/');
+  pos1 = callbackStr.indexOf(':');
+  pos2 = callbackStr.indexOf('/');
   if (pos2 < 1)
   {
-    String msg = String("callback invalid") + callback;
+    String msg = String("callback invalid") + callbackStr;
     sendError(msg);
     return false;
   }
 
   String host;
-  int port;
   String path;
   if (pos1 > -1)
   {
-    host = callback.substring(0, pos1);
-    String p = callback.substring(pos1 + 1, pos2);
-    port = p.toInt();
+    host = callbackStr.substring(0, pos1);
+    String p = callbackStr.substring(pos1 + 1, pos2);
+    callback.port = p.toInt();
   }
   else
   {
-    host = callback.substring(0, pos2);
-    port = 80;
+    host = callbackStr.substring(0, pos2);
+    callback.port = 80;
   }
-  path = callback.substring(pos2);
+  path = callbackStr.substring(pos2);
 
-  dev->pushCallback.set = true;
-  dev->pushCallback.port = port;
-  memset(dev->pushCallback.host, 0, sizeof(dev->pushCallback.host));
-  strncpy(dev->pushCallback.host, host.c_str(), strlen(host.c_str()));
-  memset(dev->pushCallback.path, 0, sizeof(dev->pushCallback.path));
-  strncpy(dev->pushCallback.path, path.c_str(), strlen(path.c_str()));
+  callback.set = true;
+  memset(callback.host, 0, sizeof(callback.host));
+  strncpy(callback.host, host.c_str(), strlen(host.c_str()));
+  memset(callback.path, 0, sizeof(callback.path));
+  strncpy(callback.path, path.c_str(), strlen(path.c_str()));
   if (callbackAuth.length() > 0)
   {
-    memset(dev->pushCallback.auth, 0, sizeof(dev->pushCallback.auth));
-    strncpy(dev->pushCallback.auth, callbackAuth.c_str(), strlen(callbackAuth.c_str()));
+    memset(callback.auth, 0, sizeof(callback.auth));
+    strncpy(callback.auth, callbackAuth.c_str(), strlen(callbackAuth.c_str()));
   }
 
   return true;

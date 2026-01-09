@@ -34,12 +34,13 @@ NOTE: API could change any time in version < 1.0.0
 | method | path | Description | payload |
 |----------|------------|------------|------------|
 | GET | / | devices values (in AP config mode html form to porvide credentials) |  |
+| GET | /config | get server config (without secrets) |  |
 | GET | /devices | list current devices configuration and values |  |
 | GET | /devicestypes | list supported devices types |  |
 | GET | /pinout | pins configuration |  |
 | GET | /pinsvalues | raw pins values |  |
 | GET | /status | device status |  |
-| POST | /config?id=[device id] | update config on device | configname=[configValue]&callback=[urlencode(http://hostname:port/path?arg1=value1)]&auth_header=[Basic+XXX]&interval=[interval millis] |
+| POST | /config?id=[device id (if not set update server config)] | update config on device | configname=[configValue]&callback=[urlencode(http://hostname:port/path?arg1=value1)]&auth_header=[Basic+XXX]&interval=[interval millis] |
 | POST | /creds | handle values from config html form (in AP config mode) |  |
 | POST | /device?type=[device type see /devicestypes]&pin0=[pinId A.. or D..]&pin0type=[INPUT|OUTPUT|INPUT_PULLUP]&interval=[update interval millis] | add device | see payload for /config |
 | POST | /pinout?id=[pinId A.. or D..] | configure pin |  |

@@ -212,7 +212,9 @@ bool configureNetwork()
       String ssid = String(SECRET_SSID);
       String pass = String(SECRET_PASS);
       String serverauth = String(SECRET_SERVER_AUTH);
-      writeConfig(ssid, pass, serverauth);
+      Callback callback;
+      callback.set = false;
+      writeConfig(ssid, pass, serverauth, callback);
     }
     else
     {
@@ -521,29 +523,36 @@ void handleInputDevices()
     if (dev->pollInterval == 0 || ((devicesValues[dev->deviceId].lastPoll + dev->pollInterval) < then))
     {
       devicesValues[dev->deviceId].lastPoll = then;
+      byte warnCnt = 0;
       switch (dev->type)
       {
       case DEVICE_BUTTON:
-        stats.processingWarnings += readButton(dev, stats.lastWarning);
+        warnCnt += readButton(dev, stats.lastWarning);
         break;
       case DEVICE_DHT22:
-        stats.processingWarnings += readDHT22(dev, stats.lastWarning);
+        warnCnt += readDHT22(dev, stats.lastWarning);
         break;
       case DEVICE_GENERIC_ANALOG_INPUT:
-        stats.processingWarnings += readAnalog(dev, stats.lastWarning);
+        warnCnt += readAnalog(dev, stats.lastWarning);
         break;
       case DEVICE_GENERIC_DIGITAL_INPUT:
-        stats.processingWarnings += readDigital(dev, stats.lastWarning);
+        warnCnt += readDigital(dev, stats.lastWarning);
         break;
       case DEVICE_MOTION:
-        stats.processingWarnings += readMotion(dev, stats.lastWarning);
+        warnCnt += readMotion(dev, stats.lastWarning);
         break;
       case DEVICE_SWITCH:
-        stats.processingWarnings += readSwitch(dev, stats.lastWarning);
+        warnCnt += readSwitch(dev, stats.lastWarning);
         break;
       case DEVICE_TEMP_DALLAS:
-        stats.processingWarnings += readTempDallas(dev, stats.lastWarning);
+        warnCnt += readTempDallas(dev, stats.lastWarning);
         break;
+      }
+
+      if (warnCnt > 0)
+      {
+        stats.processingWarnings += warnCnt;
+        WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
       }
     }
   }
@@ -616,6 +625,20 @@ bool handleGet(HttpRequest &req)
     }
     return true;
   }
+  else if (req.path == "/config")
+  {
+    if (WifiSensorsUtils::statusAuthorizationForbidden(authHeader, req))
+    {
+      return true;
+    }
+    WifiSensorsUtils::sendHeader("200 OK", "application/json");
+    wifiClient.println();
+    String config;
+    WifiSensorsUtils::serverConfigToString(serverConfig, config);
+    wifiClient.println(config);
+    wifiClient.println();
+    return true;
+  }
   else if (req.path == "/devices")
   {
     if (WifiSensorsUtils::statusAuthorizationForbidden(authHeader, req))
@@ -680,22 +703,34 @@ bool handlePost(HttpRequest &req, String &payload)
     {
       return true;
     }
-    String deviceId;
-    if (!WifiSensorsUtils::readParam(req, "id", deviceId))
-    {
-      WifiSensorsUtils::sendHeader("200 OK", "application/json");
-      WifiSensorsUtils::sendError("missing params: id");
-      return true;
-    }
+    WifiSensorsUtils::sendHeader("200 OK", "application/json");
 
     Hashtable<String, String> config;
     WifiSensorsUtils::parseConfigData(payload, &config);
 
-    WifiSensorsUtils::sendHeader("200 OK", "application/json");
-    if (deviceConfigUpdated(&config, &devices.devices[deviceId.toInt()]))
+    String deviceId;
+    if (!WifiSensorsUtils::readParam(req, "id", deviceId))
     {
-      devices_flash_store.write(devices);
-      WifiSensorsUtils::sendStatusOk();
+      if (handleServerConfig(&config))
+      {
+        WifiSensorsUtils::sendStatusOk();
+      }
+      else
+      {
+        WifiSensorsUtils::sendError("Server config invalid!");
+      }
+    }
+    else
+    {
+      if (deviceConfigUpdated(&config, &devices.devices[deviceId.toInt()]))
+      {
+        devices_flash_store.write(devices);
+        WifiSensorsUtils::sendStatusOk();
+      }
+      else
+      {
+        WifiSensorsUtils::sendError("Device config invalid!");
+      }
     }
 
     return true;
@@ -706,23 +741,11 @@ bool handlePost(HttpRequest &req, String &payload)
     wifiClient.println();
     wifiClient.println("<html><body>");
 
-    int pos = payload.indexOf("ssid=");
-    int pos2 = payload.indexOf("&");
-    if (pos > -1)
+    Hashtable<String, String> config;
+    WifiSensorsUtils::parseConfigData(payload, &config);
+
+    if (handleServerConfig(&config))
     {
-      pos = payload.indexOf("serverauth=");
-
-      String ssid = payload.substring(5, pos2);
-      String pass = payload.substring(pos2 + 6, pos - 1);
-      String serverauth;
-      if (pos > -1)
-      {
-        serverauth = payload.substring(pos + 11);
-        serverauth.replace("+", " ");
-      }
-
-      writeConfig(ssid, pass, serverauth);
-
       wifiClient.println("Zapisano. Restart za 3 sekundy ...");
       wifiClient.println("</html></body>");
       wifiClient.println();
@@ -981,6 +1004,7 @@ void handleMemory()
     stats.lastWarning += millis();
     Serial.print(F("Low memory: "));
     Serial.println(stats.freeMem);
+    WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
   }
 }
 
@@ -993,6 +1017,7 @@ void handleResponse(String &resp)
     stats.lastWarning += resp;
     stats.lastWarning += " ";
     stats.lastWarning += millis();
+    WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
   }
 }
 
@@ -1100,6 +1125,31 @@ void handleSerwer()
     msg += took;
     Serial.println(msg);
   }
+}
+
+bool handleServerConfig(Hashtable<String, String> *config)
+{
+  Callback callback;
+  if (WifiSensorsUtils::isCallbackUrlValid(config, callback) && config->containsKey("ssid"))
+  {
+    String ssid = *config->get("ssid");
+    String pass;
+    if (config->containsKey("pass"))
+    {
+      pass = *config->get("pass");
+    }
+    String serverauth;
+    if (config->containsKey("serverauth"))
+    {
+      serverauth = *config->get("serverauth");
+      serverauth.replace("+", " ");
+    }
+
+    writeConfig(ssid, pass, serverauth, callback);
+
+    return true;
+  }
+  return false;
 }
 
 void restart(bool set, long rdelay)
@@ -1329,17 +1379,27 @@ void showRunStatus()
   }
 }
 
-void writeConfig(String &ssid, String &pass, String &serverauth)
+void writeConfig(String &ssid, String &pass, String &serverauth, Callback &callback)
 {
   serverConfig.set = true;
   serverConfig.valid = false;
   memset(serverConfig.ssid, 0, sizeof(serverConfig.ssid));
   strncpy(serverConfig.ssid, ssid.c_str(), strlen(ssid.c_str()));
-  memset(serverConfig.pass, 0, sizeof(serverConfig.pass));
-  strncpy(serverConfig.pass, pass.c_str(), strlen(pass.c_str()));
-  memset(serverConfig.serverauth, 0, sizeof(serverConfig.serverauth));
-  strncpy(serverConfig.serverauth, serverauth.c_str(), strlen(serverauth.c_str()));
-  authHeader = serverauth;
+  if (pass.length() > 0)
+  {
+    memset(serverConfig.pass, 0, sizeof(serverConfig.pass));
+    strncpy(serverConfig.pass, pass.c_str(), strlen(pass.c_str()));
+  }
+  if (serverauth.length() > 0)
+  {
+    memset(serverConfig.serverauth, 0, sizeof(serverConfig.serverauth));
+    strncpy(serverConfig.serverauth, serverauth.c_str(), strlen(serverauth.c_str()));
+    authHeader = serverauth;
+  }
+  if (callback.set)
+  {
+    serverConfig.callback = callback;
+  }
 
   conf_flash_store.write(serverConfig);
   Serial.print("Zapisano SSID: ");

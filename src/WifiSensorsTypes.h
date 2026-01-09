@@ -67,10 +67,20 @@ typedef struct
 typedef struct
 {
   bool set;
+  char host[16];
+  int port;
+  char path[128];
+  char auth[64];
+} Callback;
+
+typedef struct
+{
+  bool set;
   bool valid;
   char ssid[32];
   char pass[64];
   char serverauth[64];
+  Callback callback;
 } ServerConfig;
 
 typedef struct
@@ -144,15 +154,6 @@ typedef struct
   Array<String, WS_MAX_DEVICE_VALUES> units;
   Array<String, WS_MAX_DEVICE_VALUES> values;
 } DevicesValues;
-
-typedef struct
-{
-  bool set;
-  char host[16];
-  int port;
-  char path[128];
-  char auth[64];
-} Callback;
 
 typedef struct
 {

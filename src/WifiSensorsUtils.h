@@ -18,9 +18,9 @@ public:
 
   static void digitalWriteAnalogPin(int pin, byte value);
 
-  static void getStatusStr(String &str, ServerStats* stats);
+  static void getStatusStr(String &str, ServerStats *stats);
 
-  static bool isCallbackUrlValid(Hashtable<String, String> *config, Device *dev);
+  static bool isCallbackUrlValid(Hashtable<String, String> *config, Callback &callback);
 
   static int memoryFree();
 
@@ -32,13 +32,15 @@ public:
 
   static bool pinUsedByDevice(Pinout &pinout, String &pinId);
 
-  static void prepareCallbackValues(char *raw, DeviceType type, byte deviceId, String &value1, String &path, String &value0Name);
+  static void prepareCallbackValues(char *raw, String &value1, String &path, String &value0Name);
 
-  static void prepareCallbackValues(char *raw, DeviceType type, byte deviceId, String &value1, String &value2, String &path, String &value0Name, String &value1Name);
+  static void prepareCallbackValues(char *raw, String &value1, String &value2, String &path, String &value0Name, String &value1Name);
+
+  static void processWarning(Callback &callback, String &msg);
 
   static void pushCallbackToString(Callback &callback, String &str);
 
-  static void printWifiStatus(ServerStats* stats);
+  static void printWifiStatus(ServerStats *stats);
 
   static bool readParam(HttpRequest &req, const char *name, String &value);
 
@@ -63,7 +65,9 @@ public:
 
   static void sendStatusForbidden();
 
-  static bool sentLoginChallange(String &serverauth, HttpRequest &req);
+  static bool sendLoginChallange(String &serverauth, HttpRequest &req);
+
+  static void serverConfigToString(ServerConfig &serverConfig, String &str);
 
   static void setAnalogPinMode(int pin, int mode);
 

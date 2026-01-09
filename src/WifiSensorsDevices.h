@@ -170,7 +170,7 @@ bool configureTempDallas(Hashtable<String, String> *config, Device *dev)
 
 bool deviceConfigUpdated(Hashtable<String, String> *config, Device *dev)
 {
-  if (!WifiSensorsUtils::isCallbackUrlValid(config, dev))
+  if (!WifiSensorsUtils::isCallbackUrlValid(config, dev->pushCallback))
   {
     return false;
   }
@@ -285,7 +285,7 @@ byte readAnalog(Device *dev, String &lastWarning)
   {
     String path;
     String value = String(val, 2);
-    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value, path, devicesValues[dev->deviceId].names[0]);
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value, path, devicesValues[dev->deviceId].names[0]);
     return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
   }
   return 0;
@@ -307,7 +307,7 @@ byte readDigital(Device *dev, String &lastWarning)
   if (dev->pushCallback.set)
   {
     String path;
-    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value, path, devicesValues[dev->deviceId].names[0]);
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value, path, devicesValues[dev->deviceId].names[0]);
     return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
   }
   return 0;
@@ -323,7 +323,7 @@ byte readButton(Device *dev, String &lastWarning)
     if (dev->pushCallback.set)
     {
       String path;
-      WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value1, path, devicesValues[dev->deviceId].names[0]);
+      WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value1, path, devicesValues[dev->deviceId].names[0]);
       return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
     }
   }
@@ -370,7 +370,7 @@ byte readDHT22(Device *dev, String &lastWarning)
   if (dev->pushCallback.set && valueTemp != "" && valueHumid != "")
   {
     String path;
-    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, valueTemp, valueHumid, path, devicesValues[dev->deviceId].names[0], devicesValues[dev->deviceId].names[1]);
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, valueTemp, valueHumid, path, devicesValues[dev->deviceId].names[0], devicesValues[dev->deviceId].names[1]);
     return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
   }
   return warnCnt;
@@ -401,7 +401,7 @@ byte readMotion(Device *dev, String &lastWarning)
       if (dev->pushCallback.set)
       {
         String path;
-        WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value1, path, devicesValues[dev->deviceId].names[0]);
+        WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value1, path, devicesValues[dev->deviceId].names[0]);
         return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
       }
     }
@@ -420,7 +420,7 @@ byte readSwitch(Device *dev, String &lastWarning)
     if (dev->pushCallback.set)
     {
       String path;
-      WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, value1, path, devicesValues[dev->deviceId].names[0]);
+      WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value1, path, devicesValues[dev->deviceId].names[0]);
       return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
     }
   }
@@ -451,7 +451,7 @@ byte readTempDallas(Device *dev, String &lastWarning)
       if (dev->pushCallback.set)
       {
         String path;
-        WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, dev->type, dev->deviceId, temp, path, devicesValues[dev->deviceId].names[0]);
+        WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, temp, path, devicesValues[dev->deviceId].names[0]);
         return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
       }
     }
