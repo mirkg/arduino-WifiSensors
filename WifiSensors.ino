@@ -1,6 +1,7 @@
 
 #define DEBUG 0
 #define WAIT_FOR_SERIAL 0
+#define LOW_MEMORY_RESTART 1
 
 #define WS_AP_NAME_PREFIX "ARDUINO_"
 #define WS_SERVER_PORT 80
@@ -34,7 +35,7 @@ String requestPath;
 
 Pinout pinout;
 Devices devices;
-DevicesValues devicesValues[WS_MAX_DEVICES];
+Array<DevicesValues, WS_MAX_DEVICES> devicesValues;
 
 // devices specific
 Bounce *debouncers[WS_MAX_DEVICES];
@@ -143,6 +144,11 @@ void addDevice(DeviceType deviceType, byte requiredPins, Array<DevicePin, WS_MAX
     dev.pins[i] = dpin;
   }
 
+  if (!WifiSensorsUtils::isCallbackUrlValid(config, dev.pushCallback, true))
+  {
+    return;
+  }
+
   if (!deviceConfigUpdated(config, &dev))
   {
     return;
@@ -160,7 +166,7 @@ void addDevice(DeviceType deviceType, byte requiredPins, Array<DevicePin, WS_MAX
 
   wifiClient.println();
   wifiClient.print("{\"status\":\"ok\",\"device\":");
-  getDevice(devices.devices[dev.deviceId]);
+  WifiSensorsUtils::sendDevice(devices.devices[dev.deviceId], devicesValues[dev.deviceId], false);
   wifiClient.println("}");
   wifiClient.println();
 }
@@ -214,7 +220,9 @@ bool configureNetwork()
       String serverauth = String(SECRET_SERVER_AUTH);
       Callback callback;
       callback.set = false;
-      writeConfig(ssid, pass, serverauth, callback);
+      WifiSensorsUtils::writeServerConfig(serverConfig, ssid, pass, serverauth, callback);
+      authHeader = serverauth;
+      conf_flash_store.write(serverConfig);
     }
     else
     {
@@ -307,207 +315,6 @@ void factoryReset()
   showRunStatus();
 }
 
-void getDevice(Device &dev)
-{
-  wifiClient.print("{\"id\":\"");
-  wifiClient.print(dev.deviceId);
-  wifiClient.print("\",\"active\":");
-  wifiClient.print(dev.active == 0 ? "false" : "true");
-  wifiClient.print(",\"type\":\"");
-  wifiClient.print(deviceTypetoStr(dev.type));
-  wifiClient.print("\",\"poll\":");
-  wifiClient.print(dev.pollInterval);
-  wifiClient.print(",\"callback\":\"");
-  String callbackStr;
-  WifiSensorsUtils::pushCallbackToString(dev.pushCallback, callbackStr);
-  wifiClient.print(callbackStr);
-  String configStr;
-  WifiSensorsUtils::configToString(dev, configStr);
-  wifiClient.print("\",\"config\":");
-  wifiClient.print(configStr);
-  wifiClient.print(",\"pins\":{");
-  for (byte j = 0; j < WifiSensorsUtils::deviceRequirePins(dev.type); j++)
-  {
-    if (j > 0)
-    {
-      wifiClient.print(",");
-    }
-    String pinId = String("pin") + (j + 1);
-    wifiClient.print("\"" + pinId + "\":{");
-    DevicePin dpin = dev.pins[j];
-    wifiClient.print("\"pin\":\"");
-    wifiClient.print(dpin.type);
-    wifiClient.print(dpin.pin);
-    wifiClient.print("\",\"mode\":\"");
-    wifiClient.print(pinModeToStr(dpin.mode));
-    wifiClient.print("\"}");
-  }
-  wifiClient.print("},\"values\":{");
-  for (byte j = 0; j < dev.valuesCount; j++)
-  {
-    if (j > 0)
-    {
-      wifiClient.print(",");
-    }
-    wifiClient.print("\"");
-    wifiClient.print(devicesValues[dev.deviceId].names[j]);
-    wifiClient.print("\":\"");
-    wifiClient.print(devicesValues[dev.deviceId].values[j]);
-    wifiClient.print("\"");
-  }
-  wifiClient.print("},\"units\":{");
-  for (byte j = 0; j < dev.valuesCount; j++)
-  {
-    if (j > 0)
-    {
-      wifiClient.print(",");
-    }
-    wifiClient.print("\"");
-    wifiClient.print(devicesValues[dev.deviceId].names[j]);
-    wifiClient.print("\":\"");
-    wifiClient.print(devicesValues[dev.deviceId].units[j]);
-    wifiClient.print("\"");
-  }
-  wifiClient.print("}}");
-}
-
-void getDevices()
-{
-  wifiClient.print("{\"devices\":[");
-  for (byte i = 0; i < devices.count; i++)
-  {
-    if (i > 0)
-    {
-      wifiClient.print(",");
-    }
-    getDevice(devices.devices[i]);
-  }
-  wifiClient.println("]}");
-}
-
-void getDevicesTypes()
-{
-  wifiClient.print("{\"types\":[");
-  for (int i = 0; i != DEVICE_UNKNOWN; i++)
-  {
-    if (i > 0)
-    {
-      wifiClient.print(",");
-    }
-
-    DeviceType t = static_cast<DeviceType>(i);
-    wifiClient.print("{\"name\":\"");
-    wifiClient.print(deviceTypetoStr(t));
-    wifiClient.print("\"}");
-  }
-  wifiClient.println("]}");
-}
-
-void getDevicesValues()
-{
-  wifiClient.print("{\"values\":{");
-  for (byte i = 0; i < devices.count; i++)
-  {
-    if (i > 0)
-    {
-      wifiClient.print(",");
-    }
-    wifiClient.print("\"");
-    wifiClient.print(devices.devices[i].deviceId);
-    wifiClient.print("\":{");
-    for (byte j = 0; j < devices.devices[i].valuesCount; j++)
-    {
-      if (j > 0)
-      {
-        wifiClient.print(",");
-      }
-      wifiClient.print("\"");
-      wifiClient.print(devicesValues[devices.devices[i].deviceId].names[j]);
-      wifiClient.print("\":\"");
-      wifiClient.print(devicesValues[devices.devices[i].deviceId].values[j]);
-      wifiClient.print("\"");
-    }
-    wifiClient.print("}");
-  }
-  wifiClient.println("}}");
-}
-
-void getPinout()
-{
-  wifiClient.print("{");
-  for (int pin = 0; pin < WS_ANALOG_PINS; pin++)
-  {
-    if (pin > 0)
-    {
-      wifiClient.print(",");
-    }
-    wifiClient.print("\"A");
-    wifiClient.print(pin);
-    wifiClient.print("\":\"");
-    wifiClient.print(pinModeToStr(pinout.analog[pin]));
-    wifiClient.print("\"");
-  }
-  for (int pin = 2; pin < WS_DIGITAL_PINS; pin++)
-  {
-    wifiClient.print(",\"D");
-    wifiClient.print(pin);
-    wifiClient.print("\":\"");
-    wifiClient.print(pinModeToStr(pinout.digital[pin]));
-    wifiClient.print("\"");
-  }
-  wifiClient.println("}");
-}
-
-void getPinsValues()
-{
-  wifiClient.print("{");
-  for (int pin = 0; pin < WS_ANALOG_PINS; pin++)
-  {
-    if (pin > 0)
-    {
-      wifiClient.print(",");
-    }
-    wifiClient.print("\"A");
-    wifiClient.print(pin);
-    wifiClient.print("\":");
-    switch (pin)
-    {
-    case 0:
-      wifiClient.print(analogRead(A0));
-      break;
-    case 1:
-      wifiClient.print(analogRead(A1));
-      break;
-    case 2:
-      wifiClient.print(analogRead(A2));
-      break;
-    case 3:
-      wifiClient.print(analogRead(A3));
-      break;
-    case 4:
-      wifiClient.print(analogRead(A4));
-      break;
-    case 5:
-      wifiClient.print(analogRead(A5));
-      break;
-    case 6:
-      wifiClient.print(analogRead(A6));
-      break;
-    case 7:
-      wifiClient.print(analogRead(A7));
-      break;
-    }
-  }
-  for (int pin = 2; pin < WS_DIGITAL_PINS; pin++)
-  {
-    wifiClient.print(",\"D");
-    wifiClient.print(pin);
-    wifiClient.print("\":");
-    wifiClient.print(digitalRead(pin));
-  }
-  wifiClient.println("}");
-}
-
 void handleInputDevices()
 {
   then = millis();
@@ -592,8 +399,9 @@ bool handleDelete(HttpRequest &req)
     byte requiredPins = WifiSensorsUtils::deviceRequirePins(devices.devices[id].type);
     for (byte i = 0; i < requiredPins; i++)
     {
-      unsetPinMode(devices.devices[id].pins[i]);
+      WifiSensorsUtils::unsetPinMode(pinout, devices.devices[id].pins[i]);
     }
+    pinout_flash_store.write(pinout);
 
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
     WifiSensorsUtils::sendStatusOk();
@@ -620,9 +428,24 @@ bool handleGet(HttpRequest &req)
       }
       WifiSensorsUtils::sendHeader("200 OK", "application/json");
       wifiClient.println();
-      getDevicesValues();
+      sendDevicesValues();
       wifiClient.println();
     }
+    return true;
+  }
+  else if (req.path == "/backup")
+  {
+    if (WifiSensorsUtils::statusAuthorizationForbidden(authHeader, req))
+    {
+      return true;
+    }
+
+    wifiClient.println("HTTP/1.1 200 OK");
+    wifiClient.println("Content-Type: application/octet-stream");
+    wifiClient.println("Content-Disposition: attachment; filename=backup.bin");
+    wifiClient.println();
+    WifiSensorsUtils::sendBackup(serverConfig, devices, devicesValues);
+    wifiClient.println();
     return true;
   }
   else if (req.path == "/config")
@@ -647,7 +470,8 @@ bool handleGet(HttpRequest &req)
     }
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
     wifiClient.println();
-    getDevices();
+    WifiSensorsUtils::sendDevices(devices, devicesValues, true, false);
+    wifiClient.println();
     wifiClient.println();
     return true;
   }
@@ -659,7 +483,7 @@ bool handleGet(HttpRequest &req)
     }
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
     wifiClient.println();
-    getDevicesTypes();
+    WifiSensorsUtils::sendDevicesTypes();
     wifiClient.println();
     return true;
   }
@@ -671,7 +495,8 @@ bool handleGet(HttpRequest &req)
     }
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
     wifiClient.println();
-    getPinout();
+    WifiSensorsUtils::sendPinout(pinout);
+    wifiClient.println();
     wifiClient.println();
     return true;
   }
@@ -689,7 +514,7 @@ bool handleGet(HttpRequest &req)
   {
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
     wifiClient.println();
-    getPinsValues();
+    WifiSensorsUtils::sendPinsValues();
   }
 
   return false;
@@ -706,7 +531,7 @@ bool handlePost(HttpRequest &req, String &payload)
     WifiSensorsUtils::sendHeader("200 OK", "application/json");
 
     Hashtable<String, String> config;
-    WifiSensorsUtils::parseConfigData(payload, &config);
+    WifiSensorsUtils::parseConfigFromPayload(payload, &config);
 
     String deviceId;
     if (!WifiSensorsUtils::readParam(req, "id", deviceId))
@@ -722,7 +547,7 @@ bool handlePost(HttpRequest &req, String &payload)
     }
     else
     {
-      if (deviceConfigUpdated(&config, &devices.devices[deviceId.toInt()]))
+      if (WifiSensorsUtils::isCallbackUrlValid(&config, devices.devices[deviceId.toInt()].pushCallback, true) && deviceConfigUpdated(&config, &devices.devices[deviceId.toInt()]))
       {
         devices_flash_store.write(devices);
         WifiSensorsUtils::sendStatusOk();
@@ -742,7 +567,7 @@ bool handlePost(HttpRequest &req, String &payload)
     wifiClient.println("<html><body>");
 
     Hashtable<String, String> config;
-    WifiSensorsUtils::parseConfigData(payload, &config);
+    WifiSensorsUtils::parseConfigFromPayload(payload, &config);
 
     if (handleServerConfig(&config))
     {
@@ -822,7 +647,7 @@ bool handlePost(HttpRequest &req, String &payload)
     }
 
     Hashtable<String, String> config;
-    WifiSensorsUtils::parseConfigData(payload, &config);
+    WifiSensorsUtils::parseConfigFromPayload(payload, &config);
     addDevice(type, requiredPins, pins, pollInterval, &config);
 
     return true;
@@ -841,7 +666,8 @@ bool handlePost(HttpRequest &req, String &payload)
       dpin.pin = pinId.substring(1).toInt();
       dpin.mode = pinModeFromStr(pinM);
       dpin.type = pinId.substring(0, 1).charAt(0);
-      setPinMode(dpin);
+      WifiSensorsUtils::setPinMode(pinout, dpin);
+      pinout_flash_store.write(pinout);
 
       WifiSensorsUtils::sendHeader("200 OK", "application/json");
       WifiSensorsUtils::sendStatusOk();
@@ -850,6 +676,34 @@ bool handlePost(HttpRequest &req, String &payload)
     {
       WifiSensorsUtils::sendHeader("200 OK", "application/json");
       WifiSensorsUtils::sendError("missing params: id,type");
+    }
+    return true;
+  }
+  else if (req.path == "/restore")
+  {
+    if (WifiSensorsUtils::statusAuthorizationForbidden(authHeader, req))
+    {
+      return true;
+    }
+
+    WifiSensorsUtils::sendHeader("200 OK", "application/json");
+    for (byte i = 0; i < WS_DIGITAL_PINS + WS_ANALOG_PINS; i++)
+    {
+      pinout.used[i] = false;
+    }
+    if (WifiSensorsUtils::restoreBackup(serverConfig, pinout, devices, devicesValues, payload, authHeader))
+    {
+      stats.devices = devices.count;
+      conf_flash_store.write(serverConfig);
+      pinout_flash_store.write(pinout);
+      devices_flash_store.write(devices);
+      WifiSensorsUtils::sendStatusOk();
+    }
+    else
+    {
+      WifiSensorsUtils::sendError("Backup invalid!");
+      // restart to re-read previous config
+      restart(true, 100);
     }
     return true;
   }
@@ -1005,6 +859,11 @@ void handleMemory()
     Serial.print(F("Low memory: "));
     Serial.println(stats.freeMem);
     WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
+
+#if LOW_MEMORY_RESTART
+    // try restart to cleanup memory
+    restart(true, 10000);
+#endif
   }
 }
 
@@ -1130,7 +989,7 @@ void handleSerwer()
 bool handleServerConfig(Hashtable<String, String> *config)
 {
   Callback callback;
-  if (WifiSensorsUtils::isCallbackUrlValid(config, callback) && config->containsKey("ssid"))
+  if (WifiSensorsUtils::isCallbackUrlValid(config, callback, true) && config->containsKey("ssid"))
   {
     String ssid = *config->get("ssid");
     String pass;
@@ -1145,7 +1004,9 @@ bool handleServerConfig(Hashtable<String, String> *config)
       serverauth.replace("+", " ");
     }
 
-    writeConfig(ssid, pass, serverauth, callback);
+    WifiSensorsUtils::writeServerConfig(serverConfig, ssid, pass, serverauth, callback);
+    conf_flash_store.write(serverConfig);
+    authHeader = serverauth;
 
     return true;
   }
@@ -1171,34 +1032,33 @@ void restart(bool set, long rdelay)
   }
 }
 
-void setPinMode(DevicePin &pin)
+void sendDevicesValues()
 {
-  if (pin.type == 'D')
+  wifiClient.print("{\"values\":{");
+  for (byte i = 0; i < devices.count; i++)
   {
-    pinout.used[pin.pin] = true;
-    pinout.digital[pin.pin] = pin.mode;
-    switch (pin.mode)
+    if (i > 0)
     {
-    case 0:
-      pinMode(pin.pin, INPUT);
-      break;
-    case 1:
-      pinMode(pin.pin, OUTPUT);
-      break;
-    case 2:
-      pinMode(pin.pin, INPUT_PULLUP);
-      break;
+      wifiClient.print(",");
     }
+    wifiClient.print("\"");
+    wifiClient.print(devices.devices[i].deviceId);
+    wifiClient.print("\":{");
+    for (byte j = 0; j < devices.devices[i].valuesCount; j++)
+    {
+      if (j > 0)
+      {
+        wifiClient.print(",");
+      }
+      wifiClient.print("\"");
+      wifiClient.print(devicesValues[devices.devices[i].deviceId].names[j]);
+      wifiClient.print("\":\"");
+      wifiClient.print(devicesValues[devices.devices[i].deviceId].values[j]);
+      wifiClient.print("\"");
+    }
+    wifiClient.print("}");
   }
-  else
-  {
-    pinout.used[WS_DIGITAL_PINS + pin.pin] = true;
-    pinout.analog[pin.pin] = pin.mode;
-    WifiSensorsUtils::setAnalogPinMode(pin.pin, pin.mode);
-  }
-
-  pinout.set = true;
-  pinout_flash_store.write(pinout);
+  wifiClient.println("}}");
 }
 
 void setRunStatus(RunStatus status)
@@ -1242,8 +1102,9 @@ void setupNewDevice(byte deviceId, bool update)
   byte requiredPins = WifiSensorsUtils::deviceRequirePins(dev->type);
   for (byte i = 0; i < requiredPins; i++)
   {
-    setPinMode(dev->pins[i]);
+    WifiSensorsUtils::setPinMode(pinout, dev->pins[i]);
   }
+  pinout_flash_store.write(pinout);
 
   switch (dev->type)
   {
@@ -1377,44 +1238,4 @@ void showRunStatus()
     digitalWrite(STATUS_PIN, HIGH);
     break;
   }
-}
-
-void writeConfig(String &ssid, String &pass, String &serverauth, Callback &callback)
-{
-  serverConfig.set = true;
-  serverConfig.valid = false;
-  memset(serverConfig.ssid, 0, sizeof(serverConfig.ssid));
-  strncpy(serverConfig.ssid, ssid.c_str(), strlen(ssid.c_str()));
-  if (pass.length() > 0)
-  {
-    memset(serverConfig.pass, 0, sizeof(serverConfig.pass));
-    strncpy(serverConfig.pass, pass.c_str(), strlen(pass.c_str()));
-  }
-  if (serverauth.length() > 0)
-  {
-    memset(serverConfig.serverauth, 0, sizeof(serverConfig.serverauth));
-    strncpy(serverConfig.serverauth, serverauth.c_str(), strlen(serverauth.c_str()));
-    authHeader = serverauth;
-  }
-  if (callback.set)
-  {
-    serverConfig.callback = callback;
-  }
-
-  conf_flash_store.write(serverConfig);
-  Serial.print("Zapisano SSID: ");
-  Serial.println(serverConfig.ssid);
-}
-
-void unsetPinMode(DevicePin &pin)
-{
-  if (pin.type == 'D')
-  {
-    pinout.used[pin.pin] = false;
-  }
-  else
-  {
-    pinout.used[WS_DIGITAL_PINS + pin.pin] = false;
-  }
-  pinout_flash_store.write(pinout);
 }

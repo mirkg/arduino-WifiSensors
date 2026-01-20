@@ -34,6 +34,7 @@ NOTE: API could change any time in version < 1.0.0
 | method | path | Description | payload |
 |----------|------------|------------|------------|
 | GET | / | devices values (in AP config mode html form to porvide credentials) |  |
+| GET | /backup | backup config to file |  |
 | GET | /config | get server config (without secrets) |  |
 | GET | /devices | list current devices configuration and values |  |
 | GET | /devicestypes | list supported devices types |  |
@@ -44,6 +45,7 @@ NOTE: API could change any time in version < 1.0.0
 | POST | /creds | handle values from config html form (in AP config mode) |  |
 | POST | /device?type=[device type see /devicestypes]&pin0=[pinId A.. or D..]&pin0type=[INPUT|OUTPUT|INPUT_PULLUP]&interval=[update interval millis] | add device | see payload for /config |
 | POST | /pinout?id=[pinId A.. or D..] | configure pin |  |
+| POST | /restore | restore config from backup | backup.bin |
 | POST | /set?id=[pinId A.. or D..] | set digital pin if not used by any device |  |
 | POST | /turnon?id=[device id] | button/realay on |  |
 | POST | /turnoff?id=[device id] | button/realay off |  |

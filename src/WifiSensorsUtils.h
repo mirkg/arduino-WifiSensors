@@ -20,11 +20,13 @@ public:
 
   static void getStatusStr(String &str, ServerStats *stats);
 
-  static bool isCallbackUrlValid(Hashtable<String, String> *config, Callback &callback);
+  static bool isCallbackUrlValid(Hashtable<String, String> *config, Callback &callback, bool needDecode);
 
   static int memoryFree();
 
-  static void parseConfigData(String &payload, Hashtable<String, String> *config);
+  static void parseConfigFromJson(String &json, Hashtable<String, String> *config);
+
+  static void parseConfigFromPayload(String &payload, Hashtable<String, String> *config);
 
   static void parseParam(String &s, byte cnt, HttpRequest &req);
 
@@ -46,9 +48,25 @@ public:
 
   static void readPayloadData(String &payload);
 
+  static bool restoreBackup(ServerConfig &serverConfig, Pinout &pinout, Devices &devices, Array<DevicesValues, WS_MAX_DEVICES> &devicesValues, String &str, String &authHeader);
+
+  static void sendBackup(ServerConfig &serverConfig, Devices &devices, Array<DevicesValues, WS_MAX_DEVICES> &devicesValues);
+
+  static bool restoreDevice(Devices &devices, Array<DevicesValues, WS_MAX_DEVICES> &devicesValues, Pinout &pinout, String str);
+
+  static bool restoreDevicesConf(Devices &devices, Array<DevicesValues, WS_MAX_DEVICES> &devicesValues, Pinout &pinout, String str);
+
+  static bool restoreServerConf(ServerConfig &serverConfig, String str, String &authHeader);
+
   static void sendChallenge();
 
   static void sendConfigHtml();
+
+  static void sendDevice(Device &dev, DevicesValues &values, bool callbackAuth);
+
+  static void sendDevices(Devices &devices, Array<DevicesValues, WS_MAX_DEVICES> &devicesValues, bool jsonPrefix, bool callbackAuth);
+
+  static void sendDevicesTypes();
 
   static void sendError(const char *msg);
 
@@ -61,6 +79,10 @@ public:
 
   static byte sendHttpRequest(Callback &callback, String path);
 
+  static void sendPinout(Pinout &pinout);
+
+  static void sendPinsValues();
+
   static void sendStatusOk();
 
   static void sendStatusForbidden();
@@ -71,9 +93,15 @@ public:
 
   static void setAnalogPinMode(int pin, int mode);
 
+  static void setPinMode(Pinout &pinout, DevicePin &pin);
+
   static void setPinValue(char pinType, int pin, byte value);
 
   static bool statusAuthorizationForbidden(String &serverauth, HttpRequest &req);
+
+  static void unsetPinMode(Pinout &pinout, DevicePin &pin);
+
+  static void writeServerConfig(ServerConfig &serverConfig, String &ssid, String &pass, String &serverauth, Callback &callback);
 };
 
 #endif

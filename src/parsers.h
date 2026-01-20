@@ -92,4 +92,107 @@ inline String encode(String &strcode)
   return urlcode;
 }
 
+template <typename T>
+inline String serialize(const T &v)
+{
+  char buffer[sizeof(T)];
+  memcpy(buffer, &v, sizeof(T));
+  return String(buffer, sizeof(T));
+}
+
+inline String crypt(String strin)
+{
+  String strout;
+  for (int i = 0; i < strin.length(); i++)
+  {
+    char c = strin[i];
+    strout += String((char)(c + 3));
+  }
+  return strout;
+}
+
+inline String decrypt(String strin)
+{
+  String strout;
+  for (int i = 0; i < strin.length(); i++)
+  {
+    char c = strin[i];
+    strout += String((char)(c - 3));
+  }
+  return strout;
+}
+
+inline bool findBoolInJson(String &str, String key, bool &value)
+{
+  int pos = str.indexOf("\"" + key + "\":");
+  if (pos < 0)
+  {
+    return false;
+  }
+  String tmp = str.substring(pos + 3 + key.length());
+  pos = tmp.indexOf(",");
+  if (pos < 0)
+  {
+    pos = tmp.indexOf("}");
+  }
+  value = tmp.substring(0, pos) == "true";
+  return true;
+}
+
+inline bool findIntInJson(String &str, String key, int &value)
+{
+  int pos = str.indexOf("\"" + key + "\":");
+  if (pos < 0)
+  {
+    return false;
+  }
+  String tmp = str.substring(pos + 3 + key.length());
+  pos = tmp.indexOf(",");
+  if (pos < 0)
+  {
+    pos = tmp.indexOf("}");
+  }
+  value = tmp.substring(0, pos).toInt();
+  return true;
+}
+
+inline bool findJsonStrInJson(String &str, String key, byte level, String &value)
+{
+  int pos = str.indexOf("\"" + key + "\":");
+  if (pos < 0)
+  {
+    return false;
+  }
+  String tmp = str.substring(pos + 3 + key.length());
+  String lvl = "";
+  for (byte i = 0; i < level; i++)
+  {
+    lvl += "}";
+  }
+  pos = tmp.indexOf(lvl);
+  if (pos < 0)
+  {
+    return false;
+  }
+  value = tmp.substring(0, pos + level);
+  return true;
+}
+
+inline bool findStrInJson(String &str, String key, String &value)
+{
+  int pos = str.indexOf("\"" + key + "\":");
+  if (pos < 0)
+  {
+    return false;
+  }
+  String tmp = str.substring(pos + 4 + key.length());
+  pos = tmp.indexOf("\",");
+  if (pos < 0)
+  {
+    pos = tmp.indexOf("\"}");
+  }
+  value = tmp.substring(0, pos);
+  return true;
+}
+
 #endif

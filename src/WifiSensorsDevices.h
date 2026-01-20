@@ -19,7 +19,7 @@
 #include <OneWire.h>
 
 extern WiFiClient wifiClient;
-extern DevicesValues devicesValues[WS_MAX_DEVICES];
+extern Array<DevicesValues, WS_MAX_DEVICES> devicesValues;
 extern Bounce *debouncers[WS_MAX_DEVICES];
 extern DHT_Unified *dht22s[WS_MAX_DEVICES];
 extern DallasTemperature *dallasTemp[WS_MAX_DEVICES];
@@ -170,11 +170,6 @@ bool configureTempDallas(Hashtable<String, String> *config, Device *dev)
 
 bool deviceConfigUpdated(Hashtable<String, String> *config, Device *dev)
 {
-  if (!WifiSensorsUtils::isCallbackUrlValid(config, dev->pushCallback))
-  {
-    return false;
-  }
-
   if (config->containsKey("interval"))
   {
     String interval = *config->get("interval");
@@ -479,6 +474,7 @@ void setupButton(Device *dev)
   {
     deviceButtonAttachAnalogPin(button, dev->pins[0].pin);
   }
+  
   button->interval(dev->config.ints[DEVICE_CONFIG_INTS_DEBOUNCE]);
   debouncers[dev->deviceId] = button;
 

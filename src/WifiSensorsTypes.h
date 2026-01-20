@@ -1,7 +1,7 @@
 #ifndef WIFISENSORS_TYPES_H
 #define WIFISENSORS_TYPES_H
 
-#define WS_VERSION "0.9.0"
+#define WS_VERSION "0.9.1"
 
 #ifndef WS_ANALOG_PINS
 #define WS_ANALOG_PINS 8
@@ -22,7 +22,7 @@
 #define WS_MAX_DEVICE_VALUES 2
 #endif
 #ifndef WS_MAX_DEVICES
-#define WS_MAX_DEVICES 15
+#define WS_MAX_DEVICES 10
 #endif
 #ifndef WS_DEVICE_CONFIG_BYTES
 #define WS_DEVICE_CONFIG_BYTES 1
@@ -160,7 +160,7 @@ typedef struct
   byte deviceId;
   bool active;
   DeviceType type;
-  long pollInterval;
+  int pollInterval;
   Callback pushCallback;
   DevicePin pins[WS_MAX_DEVICE_PINS];
   byte valuesCount;
@@ -238,6 +238,8 @@ inline String deviceTypetoStr(DeviceType type)
 
 inline int pinModeFromStr(String &pinMode)
 {
+  Serial.println(pinMode);  //TODO
+
   if (pinMode == "INPUT")
   {
     return 0;
