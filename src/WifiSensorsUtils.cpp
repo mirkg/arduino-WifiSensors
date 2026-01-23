@@ -137,7 +137,9 @@ void WifiSensorsUtils::getStatusStr(String &str, ServerStats *stats)
   str += ",\"last_warn\":\"";
   str += stats->lastWarning;
   str += "\",\"now\":";
-  str += millis();
+  str += stats->wifiConnectionTime + millis() / 1000;
+  str += ",\"connected\":";
+  str += stats->wifiConnectionTime;
   str += "}";
 }
 
@@ -388,6 +390,9 @@ void WifiSensorsUtils::printWifiStatus(ServerStats *stats)
   Serial.print(F("signal strength (RSSI):"));
   Serial.print(WiFi.RSSI());
   Serial.println(F(" dBm"));
+
+  Serial.print(F("time: "));
+  Serial.println(WiFi.getTime());
 }
 
 void WifiSensorsUtils::prepareCallbackValues(char *raw, String &value1, String &path, String &value0Name)
@@ -412,13 +417,13 @@ void WifiSensorsUtils::prepareCallbackValues(char *raw, String &value1, String &
   path.replace(replString, strValue2);
 }
 
-void WifiSensorsUtils::processWarning(Callback &callback, String &msg)
+void WifiSensorsUtils::processWarning(Callback &callback, ServerStats &stats)
 {
   if (callback.set)
   {
-    String path;
+    String path;     
     static String msgTemplate = "msg";
-    prepareCallbackValues(callback.path, msg, path, msgTemplate);
+    prepareCallbackValues(callback.path, stats.lastWarning, path, msgTemplate);
     if (!sendHttpRequest(callback, path))
     {
       Serial.println(F("Process warning failed!"));

@@ -18,6 +18,8 @@
 #include <DHT_U.h>
 #include <OneWire.h>
 
+extern unsigned long timeNow(ServerStats &stats);
+
 extern WiFiClient wifiClient;
 extern Array<DevicesValues, WS_MAX_DEVICES> devicesValues;
 extern Bounce *debouncers[WS_MAX_DEVICES];
@@ -241,7 +243,7 @@ byte deviceValuesNames(DeviceType type, byte deviceId)
   return 0;
 }
 
-byte readAnalog(Device *dev, String &lastWarning)
+byte readAnalog(Device *dev, ServerStats *stats)
 {
   int value;
   switch (dev->pins[0].pin)
@@ -286,7 +288,7 @@ byte readAnalog(Device *dev, String &lastWarning)
   return 0;
 }
 
-byte readDigital(Device *dev, String &lastWarning)
+byte readDigital(Device *dev, ServerStats *stats)
 {
   String value;
   if (digitalRead(dev->pins[0].pin) == HIGH)
@@ -308,7 +310,7 @@ byte readDigital(Device *dev, String &lastWarning)
   return 0;
 }
 
-byte readButton(Device *dev, String &lastWarning)
+byte readButton(Device *dev, ServerStats *stats)
 {
   Bounce *b = debouncers[dev->deviceId];
   if (b->update() && b->read() == LOW)
@@ -325,7 +327,7 @@ byte readButton(Device *dev, String &lastWarning)
   return 0;
 }
 
-byte readDHT22(Device *dev, String &lastWarning)
+byte readDHT22(Device *dev, ServerStats *stats)
 {
   sensors_event_t event;
   byte warnCnt = 0;
@@ -337,8 +339,9 @@ byte readDHT22(Device *dev, String &lastWarning)
   if (isnan(event.temperature))
   {
     warnCnt++;
-    lastWarning = "Reading DHT22 TEMP failed! ";
-    lastWarning += millis();
+    stats->lastWarning = "Reading DHT22 TEMP failed!";
+    stats->lastWarning += " ";
+    stats->lastWarning += timeNow(*stats);
     Serial.println(F("Reading DHT22 TEMP failed!"));
   }
   else
@@ -351,8 +354,9 @@ byte readDHT22(Device *dev, String &lastWarning)
   if (isnan(event.relative_humidity))
   {
     warnCnt++;
-    lastWarning = "Reading DTH22 HUMID failed! ";
-    lastWarning += millis();
+    stats->lastWarning = "Reading DTH22 HUMID failed!";
+    stats->lastWarning += " ";
+    stats->lastWarning += timeNow(*stats);
     Serial.println(F("Reading DTH22 HUMID failed!"));
   }
   else
@@ -371,7 +375,7 @@ byte readDHT22(Device *dev, String &lastWarning)
   return warnCnt;
 }
 
-byte readMotion(Device *dev, String &lastWarning)
+byte readMotion(Device *dev, ServerStats *stats)
 {
   Bounce *b = debouncers[dev->deviceId];
   if (b->update())
@@ -404,7 +408,7 @@ byte readMotion(Device *dev, String &lastWarning)
   return 0;
 }
 
-byte readSwitch(Device *dev, String &lastWarning)
+byte readSwitch(Device *dev, ServerStats *stats)
 {
   Bounce *b = debouncers[dev->deviceId];
   if (b->update())
@@ -422,7 +426,7 @@ byte readSwitch(Device *dev, String &lastWarning)
   return 0;
 }
 
-byte readTempDallas(Device *dev, String &lastWarning)
+byte readTempDallas(Device *dev, ServerStats *stats)
 {
   DallasTemperature *tempSensor = dallasTemp[dev->deviceId];
 
@@ -452,9 +456,9 @@ byte readTempDallas(Device *dev, String &lastWarning)
     }
     else
     {
-      lastWarning = "WARN: Could not read TEMP for device: " + dev->deviceId;
-      lastWarning += " ";
-      lastWarning += millis();
+      stats->lastWarning = "WARN: Could not read TEMP for device: " + dev->deviceId;
+      stats->lastWarning += " ";
+      stats->lastWarning += timeNow(*stats);
       Serial.print(F("WARN: Could not read TEMP for device: "));
       Serial.println(dev->deviceId);
       return 1;

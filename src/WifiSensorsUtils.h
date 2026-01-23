@@ -38,7 +38,7 @@ public:
 
   static void prepareCallbackValues(char *raw, String &value1, String &value2, String &path, String &value0Name, String &value1Name);
 
-  static void processWarning(Callback &callback, String &msg);
+  static void processWarning(Callback &callback, ServerStats &stats);
 
   static void pushCallbackToString(Callback &callback, String &str);
 

@@ -71,7 +71,7 @@ void loop()
 {
   showRunStatus();
 
-  checkAPStatus();
+  checkWifiStatus();
 
   restart(false, 0);
 
@@ -171,7 +171,7 @@ void addDevice(DeviceType deviceType, byte requiredPins, Array<DevicePin, WS_MAX
   wifiClient.println();
 }
 
-void checkAPStatus()
+void checkWifiStatus()
 {
   if (runMode == RUN_MODE_AP)
   {
@@ -187,6 +187,15 @@ void checkAPStatus()
       {
         Serial.println(F("Urządzenie rozłączone z AP"));
       }
+    }
+  }
+  else
+  {
+    status = WiFi.status();
+    if (status == WL_CONNECT_FAILED || status == WL_CONNECTION_LOST || status == WL_DISCONNECTED)
+    {
+      Serial.println(F("Wifi connection failed, restarting in 10 sec"));
+      restart(true, 10000);
     }
   }
 }
@@ -262,12 +271,16 @@ bool configureNetwork()
       status = WiFi.begin(serverConfig.ssid, serverConfig.pass);
       if (status == WL_CONNECTED)
       {
+
         if (!serverConfig.valid)
         {
           serverConfig.valid = true;
           conf_flash_store.write(serverConfig);
         }
         setRunStatus(RUN_STATUS_OK);
+        delay(5000);
+        stats.wifiConnectionTime = WiFi.getTime();
+        Serial.println(stats.wifiConnectionTime + millis() / 1000);
         return true;
       }
       delay(5000);
@@ -334,32 +347,32 @@ void handleInputDevices()
       switch (dev->type)
       {
       case DEVICE_BUTTON:
-        warnCnt += readButton(dev, stats.lastWarning);
+        warnCnt += readButton(dev, &stats);
         break;
       case DEVICE_DHT22:
-        warnCnt += readDHT22(dev, stats.lastWarning);
+        warnCnt += readDHT22(dev, &stats);
         break;
       case DEVICE_GENERIC_ANALOG_INPUT:
-        warnCnt += readAnalog(dev, stats.lastWarning);
+        warnCnt += readAnalog(dev, &stats);
         break;
       case DEVICE_GENERIC_DIGITAL_INPUT:
-        warnCnt += readDigital(dev, stats.lastWarning);
+        warnCnt += readDigital(dev, &stats);
         break;
       case DEVICE_MOTION:
-        warnCnt += readMotion(dev, stats.lastWarning);
+        warnCnt += readMotion(dev, &stats);
         break;
       case DEVICE_SWITCH:
-        warnCnt += readSwitch(dev, stats.lastWarning);
+        warnCnt += readSwitch(dev, &stats);
         break;
       case DEVICE_TEMP_DALLAS:
-        warnCnt += readTempDallas(dev, stats.lastWarning);
+        warnCnt += readTempDallas(dev, &stats);
         break;
       }
 
       if (warnCnt > 0)
       {
         stats.processingWarnings += warnCnt;
-        WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
+        WifiSensorsUtils::processWarning(serverConfig.callback, stats);
       }
     }
   }
@@ -855,10 +868,10 @@ void handleMemory()
     stats.lastWarning = "Low memory: ";
     stats.lastWarning += stats.freeMem;
     stats.lastWarning += " ";
-    stats.lastWarning += millis();
+    stats.lastWarning += timeNow(stats);
     Serial.print(F("Low memory: "));
     Serial.println(stats.freeMem);
-    WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
+    WifiSensorsUtils::processWarning(serverConfig.callback, stats);
 
 #if LOW_MEMORY_RESTART
     // try restart to cleanup memory
@@ -875,8 +888,8 @@ void handleResponse(String &resp)
     stats.lastWarning = "Request error: ";
     stats.lastWarning += resp;
     stats.lastWarning += " ";
-    stats.lastWarning += millis();
-    WifiSensorsUtils::processWarning(serverConfig.callback, stats.lastWarning);
+    stats.lastWarning += timeNow(stats);
+    WifiSensorsUtils::processWarning(serverConfig.callback, stats);
   }
 }
 

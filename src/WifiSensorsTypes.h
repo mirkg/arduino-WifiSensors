@@ -113,6 +113,7 @@ typedef struct
   int freeMem;
   unsigned long devicesProcessingThresold = 0UL;
   unsigned long processingWarnings = 0UL;
+  unsigned long wifiConnectionTime = 0UL;
   String lastWarning;
 } ServerStats;
 
