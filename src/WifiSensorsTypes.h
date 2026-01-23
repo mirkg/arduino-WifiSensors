@@ -1,7 +1,7 @@
 #ifndef WIFISENSORS_TYPES_H
 #define WIFISENSORS_TYPES_H
 
-#define WS_VERSION "0.9.1"
+#define WS_VERSION "0.9.2"
 
 #ifndef WS_ANALOG_PINS
 #define WS_ANALOG_PINS 8

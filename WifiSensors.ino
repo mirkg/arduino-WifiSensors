@@ -206,7 +206,7 @@ bool configureNetwork()
   byte mac[6];
   WiFi.macAddress(mac);
   snprintf(stats.macStr, sizeof(stats.macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
-           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+           mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
 
   serverConfig = conf_flash_store.read();
   authHeader = String(serverConfig.serverauth);
@@ -862,7 +862,7 @@ void handleMemory()
 
 #if LOW_MEMORY_RESTART
     // try restart to cleanup memory
-    restart(true, 10000);
+    softReset();
 #endif
   }
 }
@@ -1238,4 +1238,14 @@ void showRunStatus()
     digitalWrite(STATUS_PIN, HIGH);
     break;
   }
+}
+
+void softReset()
+{
+  NVIC_SystemReset();
+}
+
+unsigned long timeNow(ServerStats &stats)
+{
+  return stats.wifiConnectionTime + millis() / 1000;
 }
