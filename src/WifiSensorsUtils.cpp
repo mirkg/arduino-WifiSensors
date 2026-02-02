@@ -1163,6 +1163,16 @@ void WifiSensorsUtils::unsetPinMode(Pinout &pinout, DevicePin &pin)
   }
 }
 
+int WifiSensorsUtils::waitForWiFiStatus()
+{
+  unsigned long start = millis();
+  while((!WiFi.status() || WiFi.status() >= WL_DISCONNECTED) && (millis() - start) < 1000)
+  {
+    delay(100);
+  }
+  return WiFi.status();
+}
+
 void WifiSensorsUtils::writeServerConfig(ServerConfig &serverConfig, String &ssid, String &pass, String &serverauth, Callback &callback)
 {
   serverConfig.set = true;

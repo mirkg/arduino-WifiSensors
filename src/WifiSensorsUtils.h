@@ -101,6 +101,8 @@ public:
 
   static void unsetPinMode(Pinout &pinout, DevicePin &pin);
 
+  static int waitForWiFiStatus();
+
   static void writeServerConfig(ServerConfig &serverConfig, String &ssid, String &pass, String &serverauth, Callback &callback);
 };
 

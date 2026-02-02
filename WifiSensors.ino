@@ -191,7 +191,7 @@ void checkWifiStatus()
   }
   else
   {
-    status = WiFi.status();
+    status = WifiSensorsUtils::waitForWiFiStatus();
     if (status == WL_CONNECT_FAILED || status == WL_CONNECTION_LOST || status == WL_DISCONNECTED)
     {
       Serial.println(F("Wifi connection failed, restarting in 10 sec"));
