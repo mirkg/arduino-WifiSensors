@@ -44,6 +44,12 @@ void WifiSensorsUtils::configToString(Device &dev, String &str)
     str += dev.config.floats[DEVICE_CONFIG_FLOAT_MIN];
     str += ",\"max\":";
     str += dev.config.floats[DEVICE_CONFIG_FLOAT_MAX];
+    str += ",\"readcnt\":";
+    str += dev.config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_CNT];
+    str += ",\"readdelay\":";
+    str += dev.config.ints[DEVICE_CONFIG_INTS_ANALOG_READ_DELAY];
+    str += ",\"removeminmax\":";
+    str += dev.config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX] == 0x0 ? "\"false\"" : "\"true\"";
     break;
   case DEVICE_MOTION:
     str += "\"bounce\":";

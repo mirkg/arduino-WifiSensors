@@ -25,10 +25,10 @@
 #define WS_MAX_DEVICES 10
 #endif
 #ifndef WS_DEVICE_CONFIG_BYTES
-#define WS_DEVICE_CONFIG_BYTES 1
+#define WS_DEVICE_CONFIG_BYTES 3
 #endif
 #ifndef WS_DEVICE_CONFIG_INTS
-#define WS_DEVICE_CONFIG_INTS 1
+#define WS_DEVICE_CONFIG_INTS 2
 #endif
 #ifndef WS_DEVICE_CONFIG_FLOATS
 #define WS_DEVICE_CONFIG_FLOATS 4
@@ -133,6 +133,8 @@ enum DeviceType
 enum DeviceConfigBytes
 {
   DEVICE_CONFIG_BYTES_TRIGGER,
+  DEVICE_CONFIG_BYTES_ANALOG_READ_CNT,
+  DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX,
 };
 
 enum DeviceConfigFloats
@@ -146,6 +148,7 @@ enum DeviceConfigFloats
 enum DeviceConfigInts
 {
   DEVICE_CONFIG_INTS_DEBOUNCE,
+  DEVICE_CONFIG_INTS_ANALOG_READ_DELAY
 };
 
 typedef struct

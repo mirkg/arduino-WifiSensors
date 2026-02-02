@@ -5,6 +5,7 @@
 /config
 * BUTTON - bounce=[int] default:20
 * DHT22 - humid_adj[float] default:0.0, temp_adj[float] default:0.0
+* GENERIC_ANALOG - min[float] default:0.0, max[float] default:1023, readcnt[byte] default:1, readdelay[int] default:0, removeminmax[true|false] default:false
 * MOTION - bounce=[int] default:5
 * RELAY - trigger=[HIGH|LOW] default:HIGH
 * DEVICE_TEMP_DALLAS - temp_adj[float] default:0.0
@@ -116,6 +117,40 @@ bool configureGenericAnalog(Hashtable<String, String> *config, Device *dev)
   else
   {
     dev->config.floats[DEVICE_CONFIG_FLOAT_MAX] = 1023.0f;
+  }
+  if (config->containsKey("readcnt"))
+  {
+    String readcnt = *config->get("readcnt");
+    dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_CNT] = (byte)readcnt.toInt();
+  }
+  else
+  {
+    dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_CNT] = 1;
+  }
+  if (config->containsKey("readdelay"))
+  {
+    String readdelay = *config->get("readdelay");
+    dev->config.ints[DEVICE_CONFIG_INTS_ANALOG_READ_DELAY] = readdelay.toInt();
+  }
+  else
+  {
+    dev->config.ints[DEVICE_CONFIG_INTS_ANALOG_READ_DELAY] = 0;
+  }
+  if (config->containsKey("removeminmax"))
+  {
+    String removeminmax = *config->get("removeminmax");
+    if (removeminmax == "true")
+    {
+      dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX] = 0x1;
+    }
+    else
+    {
+      dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX] = 0x0;
+    }
+  }
+  else
+  {
+    dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX] = 0x0;
   }
 
   return true;
@@ -243,49 +278,77 @@ byte deviceValuesNames(DeviceType type, byte deviceId)
   return 0;
 }
 
-byte readAnalog(Device *dev, ServerStats *stats)
+byte readAnalog(Device *dev, ServerStats *stats, byte readCnt, int readDelay, bool removeMinMax)
 {
-  int value;
-  switch (dev->pins[0].pin)
+  if (readCnt < 1)
   {
-  case 0:
-    value = analogRead(A0);
-    break;
-  case 1:
-    value = analogRead(A1);
-    break;
-  case 2:
-    value = analogRead(A2);
-    break;
-  case 3:
-    value = analogRead(A3);
-    break;
-  case 4:
-    value = analogRead(A4);
-    break;
-  case 5:
-    value = analogRead(A5);
-    break;
-  case 6:
-    value = analogRead(A6);
-    break;
-  case 7:
-    value = analogRead(A7);
-    break;
+    readCnt = 1;
   }
 
-  value = map(value, 0, 1023, dev->config.floats[DEVICE_CONFIG_FLOAT_MIN], dev->config.floats[DEVICE_CONFIG_FLOAT_MAX]);
-  float val = 1.0f * value;
-  devicesValues[dev->deviceId].values[0] = String(val, 2);
+  float tmpVal, value = 0.0f;
+  int min = 123;
+  int max = 0;
+
+  for (byte i = 0; i < readCnt; ++i)
+  {
+    switch (dev->pins[0].pin)
+    {
+    case 0:
+      tmpVal = analogRead(A0);
+      break;
+    case 1:
+      tmpVal = analogRead(A1);
+      break;
+    case 2:
+      tmpVal = analogRead(A2);
+      break;
+    case 3:
+      tmpVal = analogRead(A3);
+      break;
+    case 4:
+      tmpVal = analogRead(A4);
+      break;
+    case 5:
+      tmpVal = analogRead(A5);
+      break;
+    case 6:
+      tmpVal = analogRead(A6);
+      break;
+    case 7:
+      tmpVal = analogRead(A7);
+      break;
+    }
+    min = (tmpVal < min ? tmpVal : min);
+    max = (tmpVal > max ? tmpVal : max);
+    value += tmpVal;
+    delay(readDelay);
+  }
+  if (removeMinMax)
+  {
+    value -= min;
+    value -= max;
+  }
+  value /= (1.0 * readCnt);
+
+  value = 1.0 * map(value, 0, 1023, dev->config.floats[DEVICE_CONFIG_FLOAT_MIN], dev->config.floats[DEVICE_CONFIG_FLOAT_MAX]);
+  devicesValues[dev->deviceId].values[0] = String(value, 2);
 
   if (dev->pushCallback.set)
   {
     String path;
-    String value = String(val, 2);
-    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, value, path, devicesValues[dev->deviceId].names[0]);
+    String strValue = String(value, 2);
+    WifiSensorsUtils::prepareCallbackValues(dev->pushCallback.path, strValue, path, devicesValues[dev->deviceId].names[0]);
     return WifiSensorsUtils::sendHttpRequest(dev->pushCallback, path);
   }
   return 0;
+}
+
+byte readAnalog(Device *dev, ServerStats *stats)
+{
+  byte cnt = dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_CNT];
+  int readDelay = dev->config.bytes[DEVICE_CONFIG_INTS_ANALOG_READ_DELAY];
+  bool removeMinMax = dev->config.bytes[DEVICE_CONFIG_BYTES_ANALOG_READ_REMOVE_MINMAX];
+  return readAnalog(dev, stats, cnt, readDelay, removeMinMax);
 }
 
 byte readDigital(Device *dev, ServerStats *stats)
@@ -478,7 +541,7 @@ void setupButton(Device *dev)
   {
     deviceButtonAttachAnalogPin(button, dev->pins[0].pin);
   }
-  
+
   button->interval(dev->config.ints[DEVICE_CONFIG_INTS_DEBOUNCE]);
   debouncers[dev->deviceId] = button;
 
